@@ -123,7 +123,11 @@ unpack_ramdisk() {
     mv -f ramdisk.cpio.gz ramdisk.cpio;
   fi;
 
-  comp=$($bin/magiskboot decompress ramdisk.cpio 2>&1 | head -n1 | cut -d[ -f2 | cut -d] -f1 | grep -v 'compressed');
+  if [ -f ramdisk.cpio ]; then
+    comp=$($bin/magiskboot decompress ramdisk.cpio 2>&1 | head -n1 | cut -d[ -f2 | cut -d] -f1 | grep -v 'compressed');
+  else
+    abort "No ramdisk found to unpack. Aborting...";
+  fi;
   if [ "$comp" -a "$comp" != "raw" ]; then
     mv -f ramdisk.cpio ramdisk.cpio.$comp;
     $bin/magiskboot decompress ramdisk.cpio.$comp ramdisk.cpio;
@@ -133,7 +137,7 @@ unpack_ramdisk() {
     fi;
   fi;
 
-  mv -f $ramdisk $home/rdtmp;
+  test -d $ramdisk && mv -f $ramdisk $home/rdtmp;
   mkdir -p $ramdisk;
   chmod 755 $ramdisk;
 
@@ -142,7 +146,7 @@ unpack_ramdisk() {
   if [ $? != 0 -o ! "$(ls)" ]; then
     abort "Unpacking ramdisk failed. Aborting...";
   fi;
-  if [ "$(ls $home/rdtmp)" ]; then
+  if [ -d "$home/rdtmp" ]; then
     cp -af $home/rdtmp/* .;
   fi;
 }
@@ -228,15 +232,15 @@ flash_boot() {
       $bin/mkmtkhdr --kernel $kernel;
       kernel=$kernel-mtk;
     fi;
-  elif [ "$(ls $split_img/kernel*)" ]; then
+  elif [ "$(ls $split_img/kernel* 2>/dev/null)" ]; then
     kernel=$(ls $split_img/kernel* | grep -v 'kernel_dtb' | tail -n1);
   fi;
-  if [ "$(ls ramdisk-new.cpio*)" ]; then
+  if [ "$(ls ramdisk-new.cpio* 2>/dev/null)" ]; then
     ramdisk=$home/$(ls ramdisk-new.cpio* | tail -n1);
   elif [ -f "$bin/mkmtkhdr" -a -f "$split_img/boot.img-base" ]; then
     ramdisk=$split_img/ramdisk.cpio.gz-mtk;
   else
-    ramdisk=$(ls $split_img/ramdisk.cpio* | tail -n1);
+    ramdisk=$(ls $split_img/ramdisk.cpio* 2>/dev/null | tail -n1);
   fi;
   for fdt in dt recovery_dtbo dtb; do
     for i in $home/$fdt $home/$fdt.img $split_img/$fdt; do
@@ -270,8 +274,8 @@ flash_boot() {
     test "$dt" && dt="--dt $dt";
     $bin/mkbootimg --kernel $kernel --ramdisk $ramdisk --cmdline "$cmdline" --base $home --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --tags_offset "$tagsoff" $dt --output $home/boot-new.img;
   else
-    cp -f $kernel kernel;
-    cp -f $ramdisk ramdisk.cpio;
+    test "$kernel" && cp -f $kernel kernel;
+    test "$ramdisk" && cp -f $ramdisk ramdisk.cpio;
     case $kernel in
       *-dtb) rm -f kernel_dtb;;
     esac;
@@ -310,7 +314,7 @@ flash_boot() {
   fi;
 
   if [ ! -f boot-new.img ]; then
-    abort "Repacked image could not be found. Aborting...";
+    abort "No repacked image found to flash. Aborting...";
   elif [ "$(wc -c < boot-new.img)" -gt "$(wc -c < boot.img)" ]; then
     abort "New image larger than boot partition. Aborting...";
   fi;
@@ -563,18 +567,19 @@ patch_ueventd() {
 ### configuration/setup functions:
 # reset_ak [keep]
 reset_ak() {
-  local i;
+  local current i;
 
-  if [ ! "$1" == "keep" ]; then
-    rm -rf $(dirname $home/*-files/current)/ramdisk;
-    for i in $bootimg $patch $ramdisk $split_img $home/rdtmp $home/*-new*; do
-      cp -af $i $(dirname $home/*-files/current);
+  current=$(dirname $home/*-files/current);
+  if [ -d "$current" ]; then
+    rm -rf $current/ramdisk;
+    for i in $bootimg boot-new.img; do
+      test -e $i && cp -af $i $current;
     done;
   fi;
   rm -rf $bootimg $ramdisk $split_img $home/*-new* $home/*-files/current;
 
   if [ "$1" == "keep" ]; then
-    mv -f $home/rdtmp $ramdisk;
+    test -d $home/rdtmp && mv -f $home/rdtmp $ramdisk;
   else
     rm -rf $patch $home/rdtmp;
   fi;
@@ -583,16 +588,18 @@ reset_ak() {
 
 # setup_ak
 setup_ak() {
+  local blockfiles parttype name part mtdmount mtdpart mtdname target;
+
   # allow multi-partition ramdisk modifying configurations (using reset_ak)
-  if [ ! -d "$ramdisk" -a ! -d "$patch" ]; then
-    if [ -d "$(basename $block)-files" ]; then
-      cp -af $home/$(basename $block)-files/* $home;
+  if [ "$block" ] && [ ! -d "$ramdisk" -a ! -d "$patch" ]; then
+    blockfiles=$home/$(basename $block)-files;
+    if [ "$(ls $blockfiles 2>/dev/null)" ]; then
+      cp -af $blockfiles/* $home;
     else
-      mkdir -p $home/$(basename $block)-files;
+      mkdir -p $blockfiles;
     fi;
-    touch $home/$(basename $block)-files/current;
+    touch $blockfiles/current;
   fi;
-  test ! -d "$ramdisk" && mkdir -p $ramdisk;
 
   # slot detection enabled by is_slot_device=1 or auto (from anykernel.sh)
   case $is_slot_device in
@@ -631,16 +638,16 @@ setup_ak() {
         recovery) parttype="ramdisk_recovey recovery RECOVERY SOS android_recovery";;
       esac;
       for name in $parttype; do
-        for part in $name $name$slot; do
+        for part in $name$slot $name; do
           if [ "$(grep -w "$part" /proc/mtd 2> /dev/null)" ]; then
             mtdmount=$(grep -w "$part" /proc/mtd);
             mtdpart=$(echo $mtdmount | cut -d\" -f2);
             if [ "$mtdpart" == "$part" ]; then
-              mtd=$(echo $mtdmount | cut -d: -f1);
+              mtdname=$(echo $mtdmount | cut -d: -f1);
             else
               abort "Unable to determine mtd $block partition. Aborting...";
             fi;
-            target=/dev/mtd/$mtd;
+            target=/dev/mtd/$mtdname;
           elif [ -e /dev/block/by-name/$part ]; then
             target=/dev/block/by-name/$part;
           elif [ -e /dev/block/bootdevice/by-name/$part ]; then

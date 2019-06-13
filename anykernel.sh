@@ -61,7 +61,7 @@ dump_boot;
 android_version="$(file_getprop /system/build.prop "ro.build.version.release")";
 security_patch="$(file_getprop /system/build.prop "ro.build.version.security_patch")";
 case "$android_version:$security_patch" in
-  "9:2019-05-05"|"Q:2019-04-05"|"10:2019-05-05") support_status="a supported";;
+  "9:2019-06-05"|"10:2019-06-05") support_status="a supported";;
   "8.1.0"*|"P"*|"9"*|"Q"*|"10"*) support_status="an unsupported";;
   *) abort "Completely unsupported OS configuration!";;
 esac;

@@ -30,7 +30,7 @@ int2ver() {
   fi;
 }
 cleanup() {
-  cd $home/..;
+  cd $(dirname $home);
   rm -rf $home;
 }
 debugging() {
@@ -49,7 +49,7 @@ unmount_all() {
     $bb umount /system_root;
   fi;
   $bb umount /system;
-  $bb umount /vendor;
+  umount /vendor;
   $bb umount /data) 2>/dev/null;
 }
 abort() {
@@ -71,6 +71,17 @@ unzip -o "$ZIPFILE";
 if [ $? != 0 -o ! "$(ls tools)" ]; then
   abort "Unzip failed. Aborting...";
 fi;
+for arch32 in x86 arm; do
+  if [ -d $home/tools/$arch32 ]; then
+    bb=$home/tools/$arch32/busybox;
+    chmod 755 $bb;
+    $bb >/dev/null 2>&1;
+    if [ $? == 0 ]; then
+      $bb mv -f $home/tools/$arch32/* $home/tools;
+      break;
+    fi;
+  fi;
+done;
 bb=$home/tools/busybox;
 chmod 755 $bb;
 $bb chmod -R 755 tools bin;

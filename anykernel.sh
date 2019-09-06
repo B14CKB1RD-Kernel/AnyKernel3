@@ -14,8 +14,8 @@ device.name2=taimen
 device.name3=wahoo
 device.name4=
 device.name5=
-supported.versions=
-supported.patchlevels=
+supported.versions=9.0 - 10
+supported.patchlevels=2019-09 -
 '; } # end properties
 
 # shell variables
@@ -57,16 +57,6 @@ dump_boot;
 # append_file fstab.tuna "usbdisk" fstab;
 
 # end ramdisk changes
-
-# Warn user of their support status
-android_version="$(file_getprop /system/build.prop "ro.build.version.release")";
-security_patch="$(file_getprop /system/build.prop "ro.build.version.security_patch")";
-case "$android_version:$security_patch" in
-  "9:2019-09-05"|"10:2019-09-05") support_status="a supported";;
-  "8.1.0"*|"P"*|"9"*|"Q"*|"10"*) support_status="an unsupported";;
-  *) abort "Completely unsupported OS configuration!";;
-esac;
-ui_print " "; ui_print "You are on $android_version with the $security_patch security patch level! This is $support_status configuration...";
 
 # If the kernel image and dtbs are separated in the zip
 decompressed_image=/tmp/anykernel/kernel/Image

@@ -15,7 +15,7 @@ device.name3=wahoo
 device.name4=
 device.name5=
 supported.versions=9.0 - 10
-supported.patchlevels=2019-09 -
+supported.patchlevels=2019-10 -
 '; } # end properties
 
 # shell variables

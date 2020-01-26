@@ -24,18 +24,13 @@ ramdisk_compression=auto;
 . tools/ak3-core.sh;
 
 ## AnyKernel install
-dump_boot;
+# dump_boot;
+split_boot;
 
-decompressed_image=/tmp/anykernel/Image
-compressed_image=$decompressed_image.lz4-dtb
-if [ -f $compressed_image ]; then
-  # Hexpatch the kernel if Magisk is installed ('skip_initramfs' -> 'want_initramfs')
-  if [ -d $ramdisk/.backup ]; then
-    ui_print " "; ui_print "Magisk detected! Patching kernel so reflashing Magisk is not necessary...";
-    $bin/magiskboot decompress $compressed_image $decompressed_image;
-    $bin/magiskboot hexpatch $decompressed_image 736B69705F696E697472616D667300 77616E745F696E697472616D667300;
-    $bin/magiskboot compress=lz4 $decompressed_image $compressed_image;
-  fi;
+if [ -f $split_img/ramdisk.cpio ]; then
+  unpack_ramdisk;
+  repack_ramdisk;
 fi;
 
-write_boot;
+flash_boot;
+flash_dtbo;

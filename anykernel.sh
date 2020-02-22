@@ -15,7 +15,7 @@ device.name2=taimen
 device.name3=wahoo
 device.name4=
 device.name5=
-supported.versions=9.0 - 10
+supported.versions=
 supported.patchlevels=2019-10 -
 '; } # end properties
 

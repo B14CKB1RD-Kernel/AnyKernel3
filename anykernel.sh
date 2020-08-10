@@ -4,7 +4,7 @@
 ## AnyKernel setup
 # begin properties
 properties() { '
-kernel.string=Sultan Kernel for the Pixel 2 and Pixel 2 XL
+kernel.string=B14CKB1RD-Kernel for the Pixel 2 and 2 XL
 do.devicecheck=1
 do.modules=0
 do.systemless=1
